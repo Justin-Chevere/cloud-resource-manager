@@ -1,5 +1,8 @@
 # cloud-resource-manager
 
+[![CI](https://github.com/Justin-Chevere/cloud-resource-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/Justin-Chevere/cloud-resource-manager/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A small control plane that manages container resources through a declarative API, modeled on
 how Kubernetes works: the API records *desired state*, and a reconciler loop makes reality match it.
 
