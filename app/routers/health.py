@@ -1,18 +1,18 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db import DbSession
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def health(db: Annotated[Session, Depends(get_db)]) -> dict[str, str]:
-    """Liveness and readiness in one: 200 only if the database answers."""
+def health(db: DbSession) -> dict[str, str]:
+    """Liveness and readiness in one: 200 only if the database answers.
+
+    Public on purpose: load balancers and Kubernetes probes can't log in.
+    """
     try:
         db.execute(text("SELECT 1"))
     except SQLAlchemyError as exc:

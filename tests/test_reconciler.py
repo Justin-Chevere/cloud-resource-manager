@@ -105,23 +105,24 @@ def test_one_failing_resource_does_not_block_the_others_and_recovers(session_fac
         assert _actual(db, bad) == ActualState.RUNNING
 
 
-def test_api_changes_converge_through_the_reconciler(client, session_factory, runtime):
-    created = client.post("/resources", json={"name": "web-1", "image": "nginx"}).json()
+def test_api_changes_converge_through_the_reconciler(operator_client, session_factory, runtime):
+    api = operator_client
+    created = api.post("/resources", json={"name": "web-1", "image": "nginx"}).json()
     assert created["actual_state"] == "pending"
 
     with session_factory() as db:
         reconcile_once(db, runtime)
-    assert client.get(f"/resources/{created['id']}").json()["actual_state"] == "running"
+    assert api.get(f"/resources/{created['id']}").json()["actual_state"] == "running"
 
-    client.patch(f"/resources/{created['id']}", json={"desired_state": "stopped"})
+    api.patch(f"/resources/{created['id']}", json={"desired_state": "stopped"})
     with session_factory() as db:
         reconcile_once(db, runtime)
-    assert client.get(f"/resources/{created['id']}").json()["actual_state"] == "stopped"
+    assert api.get(f"/resources/{created['id']}").json()["actual_state"] == "stopped"
 
-    client.delete(f"/resources/{created['id']}")
+    api.delete(f"/resources/{created['id']}")
     with session_factory() as db:
         reconcile_once(db, runtime)
-    assert client.get(f"/resources/{created['id']}").status_code == 404
+    assert api.get(f"/resources/{created['id']}").status_code == 404
 
 
 def test_background_loop_converges_and_stops_on_cancel(session_factory, runtime):

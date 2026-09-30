@@ -1,6 +1,8 @@
+import secrets
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +13,11 @@ class Settings(BaseSettings):
 
     app_name: str = "cloud-resource-manager"
     database_url: str = "sqlite:///./controlplane.db"
+
+    # Signs login tokens. There is deliberately no fixed default (the repo is
+    # public): unset, each process makes a random one, so logins reset on restart.
+    jwt_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32), min_length=32)
+    access_token_minutes: int = Field(default=30, gt=0)
 
     reconciler_enabled: bool = True
     reconcile_interval_seconds: float = 2.0
