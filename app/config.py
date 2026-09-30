@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # against SQLite locally and Postgres in a deployed environment.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_name: str = "cloud-control-plane"
+    app_name: str = "cloud-resource-manager"
     database_url: str = "sqlite:///./controlplane.db"
 
     reconciler_enabled: bool = True

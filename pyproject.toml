@@ -1,5 +1,5 @@
 [project]
-name = "cloud-control-plane"
+name = "cloud-resource-manager"
 version = "0.1.0"
 description = "A small control plane that manages container resources through a declarative API."
 requires-python = ">=3.11"

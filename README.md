@@ -1,4 +1,4 @@
-# cloud-control-plane
+# cloud-resource-manager
 
 A small control plane that manages container resources through a declarative API, modeled on
 how Kubernetes works: the API records *desired state*, and a reconciler loop makes reality match it.
