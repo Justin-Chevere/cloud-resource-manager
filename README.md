@@ -14,14 +14,13 @@ how Kubernetes works: the API records *desired state*, and a reconciler loop mak
 - [x] Reconciler loop that converges actual state to desired state (in-memory runtime)
 - [x] Auth (JWT), role-based access control and an audit log
 - [x] Login rate limiting and password reset with one-time tokens
+- [x] Metrics: CPU and memory per resource, sampled every 15 seconds and kept for 24 hours
 - [x] CI: lint and tests on Python 3.11 and 3.14
 
 ## Next steps
 
 1. **Docker runtime:** implement `ContainerRuntime` on the Docker Engine, so the reconciler
    starts, stops and removes real containers instead of in-memory stand-ins.
-2. **Metrics:** collect CPU and memory usage per resource and serve it from the API, ready for
-   a dashboard.
 
 After that: deploy with Docker and Terraform.
 
@@ -39,6 +38,31 @@ actually running, and fixes any difference, then records the result in `actual_s
 - **Clean ownership:** the API writes only `desired_state`, the reconciler only `actual_state`,
   so neither can overwrite the other's updates.
 
+## Metrics
+
+A collector reads the CPU and memory use of every running resource every 15 seconds and keeps 24
+hours of readings, ready for a dashboard:
+
+- `GET /metrics/latest`: the newest reading of each resource, for an overview screen.
+- `GET /resources/{id}/metrics?minutes=60`: one resource's readings, oldest first, for a chart
+  (up to 24 hours back).
+
+How it's built:
+
+- **Its own loop:** collection runs apart from the reconciler, so slow or failing metrics can
+  never delay the work of keeping resources in their desired state.
+- **Bounded storage:** each pass deletes readings older than the retention window, and an index
+  on (resource, time) keeps chart queries fast as the table grows.
+- **Failures stay contained:** a container whose stats can't be read is logged and skipped; every
+  other resource still gets its reading.
+- **Unambiguous time:** timestamps are stored and sent as UTC with a `Z`, so a browser can't
+  mistake them for local time and shift a chart.
+- **CPU** is a percentage of one core, as in `docker stats`. Until the Docker runtime lands, the
+  in-memory runtime simulates believable load that repeats the same way on every run.
+
+At larger scale, the same readings would go to a time-series database such as Prometheus instead
+of the application database.
+
 ## Auth and roles
 
 Every endpoint requires a bearer token except `/health`, logging in, and completing a password
@@ -46,7 +70,7 @@ reset.
 
 | Role | Can |
 |------|-----|
-| `viewer` | List and read resources |
+| `viewer` | List and read resources and their metrics |
 | `operator` | Everything a viewer can, plus create, start, stop and delete resources |
 | `admin` | Everything an operator can, plus manage users and read the audit log |
 
@@ -109,13 +133,14 @@ ruff check .
 | `app/db.py` | Engine, session factory, per-request session dependency |
 | `app/models.py` | Database tables |
 | `app/schemas.py` | Request and response shapes, validation |
-| `app/routers/` | HTTP endpoints: health, auth, resources, users, audit |
+| `app/routers/` | HTTP endpoints: health, auth, resources, metrics, users, audit |
 | `app/security.py` | Password hashing and token signing |
 | `app/auth.py` | Login check, current-user and role dependencies |
 | `app/throttle.py` | Sliding-window failure counters behind login rate limiting |
 | `app/audit.py` | Records audit events inside the caller's transaction |
 | `app/reconciler.py` | Loop that makes actual state match desired state |
-| `app/runtime/` | `ContainerRuntime` interface and an in-memory fake (Docker comes next) |
+| `app/metrics.py` | Loop that samples CPU and memory and enforces retention |
+| `app/runtime/` | `ContainerRuntime` interface and an in-memory fake that simulates load (Docker comes next) |
 | `app/cli.py` | Command line: create users, including the first admin |
 | `app/main.py` | Application factory |
 | `tests/` | Tests against an isolated in-memory database |

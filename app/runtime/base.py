@@ -1,4 +1,5 @@
 import enum
+from dataclasses import dataclass
 from typing import Protocol
 
 
@@ -8,8 +9,15 @@ class ObservedState(enum.StrEnum):
     MISSING = "missing"
 
 
+@dataclass(frozen=True)
+class ContainerStats:
+    # Percent of one CPU core, as in `docker stats`: 250 means two and a half cores busy.
+    cpu_percent: float
+    memory_bytes: int
+
+
 class ContainerRuntime(Protocol):
-    """What the reconciler needs from whatever actually runs containers.
+    """What the reconciler and the metrics collector need from whatever runs containers.
 
     Every method must be safe to call repeatedly: starting a running container
     or removing a missing one is a no-op, not an error.
@@ -23,3 +31,6 @@ class ContainerRuntime(Protocol):
     def stop(self, name: str) -> None: ...
 
     def remove(self, name: str) -> None: ...
+
+    def stats(self, name: str) -> ContainerStats | None:
+        """Current CPU and memory use, or None if the container isn't running."""

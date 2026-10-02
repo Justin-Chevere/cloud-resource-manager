@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     reconcile_interval_seconds: float = 2.0
     runtime: Literal["fake"] = "fake"
 
+    metrics_enabled: bool = True
+    metrics_interval_seconds: float = Field(default=15.0, gt=0)
+    metrics_retention_hours: int = Field(default=24, gt=0)
+
 
 @lru_cache
 def get_settings() -> Settings:

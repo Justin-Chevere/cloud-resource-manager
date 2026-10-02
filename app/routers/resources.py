@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -6,8 +9,8 @@ from sqlalchemy.orm import Session
 from app import audit
 from app.auth import OperatorUser, require_role
 from app.db import DbSession
-from app.models import DesiredState, Resource, Role
-from app.schemas import ResourceCreate, ResourceOut, ResourceUpdate
+from app.models import DesiredState, MetricSample, Resource, Role
+from app.schemas import MetricPoint, ResourceCreate, ResourceOut, ResourceUpdate
 
 router = APIRouter(
     prefix="/resources",
@@ -54,6 +57,23 @@ def list_resources(db: DbSession) -> list[Resource]:
 @router.get("/{resource_id}", response_model=ResourceOut)
 def get_resource(resource_id: str, db: DbSession) -> Resource:
     return _get_or_404(db, resource_id)
+
+
+@router.get("/{resource_id}/metrics", response_model=list[MetricPoint])
+def get_resource_metrics(
+    resource_id: str,
+    db: DbSession,
+    minutes: Annotated[int, Query(ge=1, le=24 * 60)] = 60,
+) -> list[MetricSample]:
+    """Readings from the last `minutes`, oldest first, ready to chart."""
+    resource = _get_or_404(db, resource_id)
+    since = datetime.now(UTC) - timedelta(minutes=minutes)
+    query = (
+        select(MetricSample)
+        .where(MetricSample.resource_id == resource.id, MetricSample.collected_at >= since)
+        .order_by(MetricSample.collected_at)
+    )
+    return list(db.scalars(query))
 
 
 @router.patch("/{resource_id}", response_model=ResourceOut)

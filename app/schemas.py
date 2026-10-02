@@ -36,6 +36,19 @@ class ResourceOut(BaseModel):
     updated_at: datetime
 
 
+class MetricPoint(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    collected_at: datetime
+    cpu_percent: float  # percent of one CPU core
+    memory_bytes: int
+
+
+class LatestMetric(MetricPoint):
+    resource_id: str
+    name: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"

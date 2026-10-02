@@ -1,8 +1,8 @@
 from app.config import Settings
-from app.runtime.base import ContainerRuntime, ObservedState
+from app.runtime.base import ContainerRuntime, ContainerStats, ObservedState
 from app.runtime.fake import FakeRuntime
 
-__all__ = ["ContainerRuntime", "FakeRuntime", "ObservedState", "build_runtime"]
+__all__ = ["ContainerRuntime", "ContainerStats", "FakeRuntime", "ObservedState", "build_runtime"]
 
 
 def build_runtime(settings: Settings) -> ContainerRuntime:
