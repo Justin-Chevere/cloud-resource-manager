@@ -92,6 +92,9 @@ How it's built:
   the built files itself, so the browser never makes a cross-origin request.
 - The session token is kept in `sessionStorage`: it survives a reload but not closing the tab. An
   HttpOnly cookie would put it out of reach of page scripts entirely.
+- **Install scripts are off:** `dashboard/.npmrc` sets `ignore-scripts=true`, so no dependency
+  can run code just by being installed, on a developer machine or in CI. That's how many npm
+  supply-chain attacks get in, and nothing in the dashboard needs one.
 
 ## Auth and roles
 
