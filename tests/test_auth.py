@@ -7,8 +7,13 @@ from app.main import app
 from app.models import Role
 from app.security import create_access_token
 
-# Every other route must turn away a caller without a token.
-PUBLIC_ROUTES = {("GET", "/health"), ("POST", "/auth/token")}
+# Every other route must turn away a caller without a token. Adding a route
+# here is a deliberate decision to make it public.
+PUBLIC_ROUTES = {
+    ("GET", "/health"),
+    ("POST", "/auth/token"),
+    ("POST", "/auth/password-reset"),
+}
 
 
 def _login(client, username, password):
@@ -19,8 +24,10 @@ def _bearer(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _claims(user_id):
-    return {"sub": user_id, "exp": datetime.now(UTC) + timedelta(minutes=5)}
+def _claims(user):
+    # Every claim a real token has, so a forgery fails only on its signature.
+    expires = datetime.now(UTC) + timedelta(minutes=5)
+    return {"sub": user.id, "ver": user.token_version, "exp": expires}
 
 
 def test_login_returns_a_token_that_identifies_the_user(client, make_user):
@@ -74,14 +81,14 @@ def test_garbage_token_is_rejected(client):
 
 def test_expired_token_is_rejected(client, make_user):
     user = make_user("alice")
-    token = create_access_token(user.id, expires_in=timedelta(seconds=-1))
+    token = create_access_token(user, expires_in=timedelta(seconds=-1))
     assert client.get("/auth/me", headers=_bearer(token)).status_code == 401
 
 
 def test_token_signed_with_another_secret_is_rejected(client, make_user):
     user = make_user("alice")
     forged = jwt.encode(
-        _claims(user.id), "an-attacker-chosen-secret-that-is-long-enough", algorithm="HS256"
+        _claims(user), "an-attacker-chosen-secret-that-is-long-enough", algorithm="HS256"
     )
     assert client.get("/auth/me", headers=_bearer(forged)).status_code == 401
 
@@ -89,7 +96,7 @@ def test_token_signed_with_another_secret_is_rejected(client, make_user):
 def test_unsigned_token_is_rejected(client, make_user):
     # The classic JWT forgery: declare "alg": "none" and send no signature at all.
     user = make_user("alice")
-    forged = jwt.encode(_claims(user.id), None, algorithm="none")
+    forged = jwt.encode(_claims(user), None, algorithm="none")
     assert client.get("/auth/me", headers=_bearer(forged)).status_code == 401
 
 

@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32), min_length=32)
     access_token_minutes: int = Field(default=30, gt=0)
 
+    # Brute-force protection for POST /auth/token: failed logins allowed per account
+    # and per client address within the window. Further attempts get 429.
+    login_max_failures_per_account: int = Field(default=5, gt=0)
+    login_max_failures_per_client: int = Field(default=20, gt=0)
+    login_failure_window_seconds: int = Field(default=900, gt=0)
+    password_reset_minutes: int = Field(default=30, gt=0)
+
     reconciler_enabled: bool = True
     reconcile_interval_seconds: float = 2.0
     runtime: Literal["fake"] = "fake"

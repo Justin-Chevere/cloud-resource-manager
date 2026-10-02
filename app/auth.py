@@ -6,9 +6,11 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import DbSession
 from app.models import Role, User
 from app.security import decode_access_token, hash_password, verify_password
+from app.throttle import LoginGuard
 
 # Reads "Authorization: Bearer <token>" and answers 401 if it is missing. The
 # tokenUrl also wires up the Authorize button in the /docs page.
@@ -19,6 +21,21 @@ _ROLE_RANK = {Role.VIEWER: 0, Role.OPERATOR: 1, Role.ADMIN: 2}
 # Checked against when the username doesn't exist, so that case takes as long as
 # a wrong password. Otherwise response times would reveal which usernames exist.
 _DUMMY_HASH = hash_password("not-a-real-password")
+
+_settings = get_settings()
+_login_guard = LoginGuard(
+    per_account=_settings.login_max_failures_per_account,
+    per_client=_settings.login_max_failures_per_client,
+    window_seconds=_settings.login_failure_window_seconds,
+)
+
+
+def get_login_guard() -> LoginGuard:
+    """The process-wide guard. A dependency so tests can swap in their own."""
+    return _login_guard
+
+
+LoginGuardDep = Annotated[LoginGuard, Depends(get_login_guard)]
 
 
 def authenticate(db: Session, username: str, password: str) -> User | None:
@@ -32,11 +49,12 @@ def authenticate(db: Session, username: str, password: str) -> User | None:
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: DbSession) -> User:
-    user_id = decode_access_token(token)
+    claims = decode_access_token(token)
     # The token only says who you are. The user and role are loaded fresh on every
-    # request, so deactivations and role changes apply even to tokens already issued.
-    user = db.get(User, user_id) if user_id is not None else None
-    if user is None or not user.is_active:
+    # request, so deactivations and role changes apply even to tokens already issued,
+    # and a token from before the last password reset no longer matches token_version.
+    user = db.get(User, claims["sub"]) if claims is not None else None
+    if user is None or not user.is_active or claims["ver"] != user.token_version:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             "invalid or expired token",

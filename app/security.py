@@ -1,10 +1,14 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from app.config import get_settings
+from app.models import User
 
 ALGORITHM = "HS256"
 
@@ -27,26 +31,37 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: str, expires_in: timedelta | None = None) -> str:
+def create_access_token(user: User, expires_in: timedelta | None = None) -> str:
     settings = get_settings()
     if expires_in is None:
         expires_in = timedelta(minutes=settings.access_token_minutes)
     now = datetime.now(UTC)
-    claims = {"sub": user_id, "iat": now, "exp": now + expires_in}
+    claims = {"sub": user.id, "ver": user.token_version, "iat": now, "exp": now + expires_in}
     return jwt.encode(claims, settings.jwt_secret, algorithm=ALGORITHM)
 
 
-def decode_access_token(token: str) -> str | None:
-    """Return the user id a valid, unexpired token was issued for, or None."""
+def decode_access_token(token: str) -> dict[str, Any] | None:
+    """Return the claims of a valid, unexpired token, or None."""
     try:
-        claims = jwt.decode(
+        return jwt.decode(
             token,
             get_settings().jwt_secret,
             # Pinned, never taken from the token's own header: letting the token
             # pick is how forged "alg": "none" tokens get accepted.
             algorithms=[ALGORITHM],
-            options={"require": ["exp", "sub"]},
+            options={"require": ["exp", "sub", "ver"]},
         )
     except jwt.InvalidTokenError:
         return None
-    return claims["sub"]
+
+
+def new_reset_token() -> tuple[str, str]:
+    """Return a one-time password-reset token and the hash to store for it."""
+    token = secrets.token_urlsafe(32)
+    return token, hash_reset_token(token)
+
+
+def hash_reset_token(token: str) -> str:
+    # A fast hash is right here, unlike for passwords: the token is 256 random
+    # bits, so there is nothing to guess and slowness would buy nothing.
+    return hashlib.sha256(token.encode()).hexdigest()

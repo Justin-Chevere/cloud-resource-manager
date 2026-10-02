@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7,6 +7,9 @@ from app.models import ActualState, DesiredState, Role
 
 # Users can ask for running or stopped. "deleted" is only reachable via DELETE.
 UserDesiredState = Literal["running", "stopped"]
+
+# Length matters more than complexity rules. The cap only bounds hashing work.
+Password = Annotated[str, Field(min_length=12, max_length=128)]
 
 
 class ResourceCreate(BaseModel):
@@ -41,8 +44,7 @@ class Token(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(pattern=r"^[a-z0-9][a-z0-9_.-]{2,31}$")
-    # Length matters more than complexity rules. The cap only bounds hashing work.
-    password: str = Field(min_length=12, max_length=128)
+    password: Password
     role: Role = Role.VIEWER
 
 
@@ -60,6 +62,16 @@ class UserOut(BaseModel):
     role: Role
     is_active: bool
     created_at: datetime
+
+
+class PasswordResetIssued(BaseModel):
+    token: str
+    expires_at: datetime
+
+
+class PasswordResetComplete(BaseModel):
+    token: str = Field(min_length=1, max_length=128)
+    new_password: Password
 
 
 class AuditEventOut(BaseModel):

@@ -13,10 +13,17 @@ how Kubernetes works: the API records *desired state*, and a reconciler loop mak
 - [x] Tests with an isolated in-memory database
 - [x] Reconciler loop that converges actual state to desired state (in-memory runtime)
 - [x] Auth (JWT), role-based access control and an audit log
+- [x] Login rate limiting and password reset with one-time tokens
 - [x] CI: lint and tests on Python 3.11 and 3.14
-- [ ] Docker runtime for the reconciler
-- [ ] Metrics collection
-- [ ] Docker/Terraform deploy
+
+## Next steps
+
+1. **Docker runtime:** implement `ContainerRuntime` on the Docker Engine, so the reconciler
+   starts, stops and removes real containers instead of in-memory stand-ins.
+2. **Metrics:** collect CPU and memory usage per resource and serve it from the API, ready for
+   a dashboard.
+
+After that: deploy with Docker and Terraform.
 
 ## How it works
 
@@ -34,7 +41,8 @@ actually running, and fixes any difference, then records the result in `actual_s
 
 ## Auth and roles
 
-Every endpoint except `/health` and the login endpoint requires a bearer token.
+Every endpoint requires a bearer token except `/health`, logging in, and completing a password
+reset.
 
 | Role | Can |
 |------|-----|
@@ -46,8 +54,20 @@ Every endpoint except `/health` and the login endpoint requires a bearer token.
   30 minutes. Wrong passwords and unknown usernames get the same answer in the same time, so
   the endpoint never reveals which accounts exist.
 - **Passwords** are hashed with Argon2id and never returned by the API.
-- **Tokens carry only the user id.** The user and role are loaded on every request, so
-  deactivating someone or changing their role applies at once, even to tokens already issued.
+- **Tokens carry only the user id and a version number.** The user and role are loaded on every
+  request, so deactivating someone or changing their role applies at once, even to tokens
+  already issued. A password reset bumps the version, which ends every older session.
+- **Login rate limiting:** after 5 failed logins for one account, or 20 from one client address,
+  within 15 minutes, further attempts get `429` with a `Retry-After` header and the password
+  isn't even checked. Unknown usernames are limited the same way, so a `429` reveals nothing
+  about which accounts exist. The counters live in process memory, which matches the
+  single-process design; running several instances would mean sharing them through Redis.
+- **Password reset:** an admin issues a one-time token (`POST /users/{id}/password-reset`) and
+  hands it to the user, who sets a new password with it (`POST /auth/password-reset`). Tokens
+  expire after 30 minutes, work once, and are stored only as a SHA-256 hash, and the admin never
+  learns the new password. A reset also lifts any login pause on the account.
+- **Lost the only admin password?** Create another admin from the command line
+  (`python -m app.cli create-user rescue --role admin`), then issue a reset.
 - **Deny by default:** routers require a signed-in user, and a test walks every endpoint in the
   OpenAPI schema and fails if any non-public one answers an anonymous request.
 - **Audit log:** each change records who made it, what changed and when, committed in the same
@@ -71,6 +91,9 @@ Open http://127.0.0.1:8000/docs, click **Authorize**, and sign in as that user.
 Set `JWT_SECRET` (see `.env.example`) for anything beyond local development. Without it, a random
 secret is generated at startup and every login resets when the server restarts.
 
+Behind a reverse proxy, start uvicorn with `--proxy-headers` (and `--forwarded-allow-ips` set to
+the proxy's address) so login rate limits see each real client, not the proxy.
+
 ## Test
 
 ```bash
@@ -89,6 +112,7 @@ ruff check .
 | `app/routers/` | HTTP endpoints: health, auth, resources, users, audit |
 | `app/security.py` | Password hashing and token signing |
 | `app/auth.py` | Login check, current-user and role dependencies |
+| `app/throttle.py` | Sliding-window failure counters behind login rate limiting |
 | `app/audit.py` | Records audit events inside the caller's transaction |
 | `app/reconciler.py` | Loop that makes actual state match desired state |
 | `app/runtime/` | `ContainerRuntime` interface and an in-memory fake (Docker comes next) |

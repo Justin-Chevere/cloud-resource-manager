@@ -8,11 +8,31 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import security
+from app.auth import get_login_guard
 from app.db import Base, get_db
 from app.main import app
 from app.models import Role, User
 from app.runtime import FakeRuntime
 from app.security import create_access_token, hash_password
+from app.throttle import LoginGuard
+
+# Small limits so tests reach them quickly.
+ACCOUNT_LIMIT = 3
+CLIENT_LIMIT = 5
+WINDOW_SECONDS = 60
+
+
+class FakeClock:
+    """Time that only moves when a test says so."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +41,16 @@ def fast_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         security, "_hasher", PasswordHasher(time_cost=1, memory_cost=8, parallelism=1)
     )
+
+
+@pytest.fixture
+def clock() -> FakeClock:
+    return FakeClock()
+
+
+@pytest.fixture
+def login_guard(clock: FakeClock) -> LoginGuard:
+    return LoginGuard(ACCOUNT_LIMIT, CLIENT_LIMIT, WINDOW_SECONDS, clock=clock)
 
 
 @pytest.fixture
@@ -35,7 +65,9 @@ def session_factory() -> sessionmaker[Session]:
 
 
 @pytest.fixture
-def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
+def client(
+    session_factory: sessionmaker[Session], login_guard: LoginGuard
+) -> Iterator[TestClient]:
     """A client with no token: an anonymous caller."""
 
     def override_get_db() -> Iterator[Session]:
@@ -46,6 +78,7 @@ def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_login_guard] = lambda: login_guard
     # Not used as a context manager on purpose: that would run the lifespan,
     # which creates the real controlplane.db file and starts the reconciler.
     yield TestClient(app)
@@ -82,7 +115,7 @@ def client_as(client: TestClient, make_user: Callable[..., User]) -> Callable[..
 
     def _client_as(role: Role, username: str | None = None) -> TestClient:
         user = make_user(username or role.value, role)
-        token = create_access_token(user.id)
+        token = create_access_token(user)
         return TestClient(app, headers={"Authorization": f"Bearer {token}"})
 
     return _client_as

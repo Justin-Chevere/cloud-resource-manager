@@ -3,7 +3,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, String
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -80,7 +80,22 @@ class User(Base):
     # Users are deactivated rather than deleted: their tokens stop working at
     # once, and the history of what they did stays intact.
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Copied into every token. A password reset bumps it, which retires all
+    # tokens issued before the reset.
+    token_version: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PasswordReset(Base):
+    """The one outstanding password-reset token for a user, if there is one."""
+
+    __tablename__ = "password_resets"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    # Only a hash. The token itself is shown once and never stored, so a leaked
+    # database can't be used to reset anyone's password.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AuditEvent(Base):

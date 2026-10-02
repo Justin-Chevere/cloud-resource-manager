@@ -1,14 +1,17 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import audit
 from app.auth import AdminUser, require_role
+from app.config import get_settings
 from app.db import DbSession
-from app.models import Role, User
-from app.schemas import UserCreate, UserOut, UserUpdate
-from app.security import hash_password
+from app.models import PasswordReset, Role, User
+from app.schemas import PasswordResetIssued, UserCreate, UserOut, UserUpdate
+from app.security import hash_password, new_reset_token
 
 router = APIRouter(
     prefix="/users",
@@ -77,3 +80,25 @@ def update_user(user_id: str, payload: UserUpdate, db: DbSession, admin: AdminUs
         db.commit()
         db.refresh(user)
     return user
+
+
+@router.post(
+    "/{user_id}/password-reset",
+    response_model=PasswordResetIssued,
+    status_code=status.HTTP_201_CREATED,
+)
+def issue_password_reset(user_id: str, db: DbSession, admin: AdminUser) -> PasswordResetIssued:
+    """Issue a one-time token the user can set a new password with.
+
+    Hand it to the user directly. The admin never learns the new password, and
+    the token is shown only in this response.
+    """
+    user = _get_or_404(db, user_id)
+    token, token_hash = new_reset_token()
+    expires_at = datetime.now(UTC) + timedelta(minutes=get_settings().password_reset_minutes)
+    # Only the newest token works: issuing one cancels any earlier one.
+    db.execute(delete(PasswordReset).where(PasswordReset.user_id == user.id))
+    db.add(PasswordReset(user_id=user.id, token_hash=token_hash, expires_at=expires_at))
+    audit.record(db, admin.username, "password_reset.issue", user.id)
+    db.commit()
+    return PasswordResetIssued(token=token, expires_at=expires_at)
