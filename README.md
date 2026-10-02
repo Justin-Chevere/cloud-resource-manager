@@ -15,7 +15,8 @@ how Kubernetes works: the API records *desired state*, and a reconciler loop mak
 - [x] Auth (JWT), role-based access control and an audit log
 - [x] Login rate limiting and password reset with one-time tokens
 - [x] Metrics: CPU and memory per resource, sampled every 15 seconds and kept for 24 hours
-- [x] CI: lint and tests on Python 3.11 and 3.14
+- [x] Web dashboard: live status, CPU and memory charts, role-aware controls (React + TypeScript)
+- [x] CI: API lint and tests on Python 3.11 and 3.14; dashboard lint, tests and build
 
 ## Next steps
 
@@ -62,6 +63,35 @@ How it's built:
 
 At larger scale, the same readings would go to a time-series database such as Prometheus instead
 of the application database.
+
+## Dashboard
+
+A React + TypeScript app in `dashboard/` that signs in against the API and shows:
+
+- summary tiles: resources, running, errors, and CPU and memory in use;
+- every resource with its live status, CPU and memory, refreshed every few seconds, so a new
+  resource can be watched going from pending to running as the reconciler works;
+- CPU and memory charts for a selected resource over 15 minutes to 24 hours, with a table view of
+  the same readings;
+- create, start, stop and delete controls for operators, and the recent audit log for admins.
+
+How it's built:
+
+- **Hand-drawn SVG charts**, no charting library: a 2px line over a light fill, a hairline grid,
+  round-number axes and the newest value labeled at the end. Hovering, or the arrow keys once a
+  chart has focus, reads out each value. CPU and memory get separate charts, never one chart with
+  two scales.
+- **Status is never color alone:** every state has an icon and a word (✓ Running, ◷ Pending,
+  ✕ Error).
+- **Light and dark themes** each have their own palette, checked for contrast and color-blind
+  safety.
+- **Fresh data** via TanStack Query: each view polls on its own schedule and refetches right
+  after a change. A rejected token signs the user out, and signing out clears every cached
+  response.
+- **One origin:** in development Vite forwards API calls to FastAPI; in production FastAPI serves
+  the built files itself, so the browser never makes a cross-origin request.
+- The session token is kept in `sessionStorage`: it survives a reload but not closing the tab. An
+  HttpOnly cookie would put it out of reach of page scripts entirely.
 
 ## Auth and roles
 
@@ -118,11 +148,28 @@ secret is generated at startup and every login resets when the server restarts.
 Behind a reverse proxy, start uvicorn with `--proxy-headers` (and `--forwarded-allow-ips` set to
 the proxy's address) so login rate limits see each real client, not the proxy.
 
+### Dashboard
+
+Requires Node.js 24.
+
+```bash
+cd dashboard
+npm install
+npm run dev        # http://localhost:5173, API calls forwarded to :8000
+```
+
+Or run `npm run build` once, and uvicorn serves the dashboard itself at http://127.0.0.1:8000/.
+
 ## Test
 
 ```bash
 pytest
 ruff check .
+
+cd dashboard
+npm run lint
+npm test
+npm run build      # type-checks, then bundles
 ```
 
 ## Layout
@@ -142,5 +189,6 @@ ruff check .
 | `app/metrics.py` | Loop that samples CPU and memory and enforces retention |
 | `app/runtime/` | `ContainerRuntime` interface and an in-memory fake that simulates load (Docker comes next) |
 | `app/cli.py` | Command line: create users, including the first admin |
-| `app/main.py` | Application factory |
+| `app/main.py` | Application factory; serves the built dashboard |
 | `tests/` | Tests against an isolated in-memory database |
+| `dashboard/` | Web dashboard: React, TypeScript, Vite, TanStack Query, SVG charts |

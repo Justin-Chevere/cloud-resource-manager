@@ -1,0 +1,634 @@
+/* Every color is a named role, defined once for light and once for dark. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --border: rgba(11, 11, 11, 0.1);
+  --hover: rgba(11, 11, 11, 0.04);
+  /* Chart furniture: recessive, one step off the surface. */
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  /* Data: one series hue, plus a lighter step of its ramp for meter tracks. */
+  --series-1: #2a78d6;
+  --track: #cde2fb;
+  /* Buttons. */
+  --accent: #256abf;
+  --on-accent: #ffffff;
+  /* Status: reserved for state, and always shown with an icon and a word. */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--page);
+}
+
+/* Dark mode has its own steps of the same ramps, not an automatic inversion. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --border: rgba(255, 255, 255, 0.1);
+    --hover: rgba(255, 255, 255, 0.05);
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --series-1: #3987e5;
+    --track: #0d366b;
+    --accent: #2a78d6;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.35rem;
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+p {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.muted {
+  color: var(--ink-2);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+/* Layout */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+}
+
+.role {
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.content {
+  display: grid;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.page-message {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+@media (max-width: 640px) {
+  .topbar,
+  .content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .card {
+    padding: 14px 16px;
+  }
+}
+
+/* Controls */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button-primary,
+.button-primary:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button-danger,
+.button-danger:hover:not(:disabled) {
+  border-color: var(--critical);
+  background: var(--critical);
+  color: #ffffff;
+}
+
+.button-small {
+  padding: 2px 10px;
+  font-size: 0.875rem;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--baseline);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link[aria-pressed='true'] {
+  text-decoration-color: var(--series-1);
+  text-decoration-thickness: 2px;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+input:not([type='checkbox']) {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--baseline);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Error text stays in ink for contrast; the colored rule marks it. */
+.form-error {
+  padding-left: 10px;
+  border-left: 3px solid var(--critical);
+  color: var(--ink);
+}
+
+/* Login */
+
+.login {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+.login-card {
+  width: min(380px, 100%);
+  gap: 16px;
+  padding: 28px;
+}
+
+.login-head {
+  display: grid;
+  gap: 4px;
+}
+
+/* Summary tiles: the numbers are the chart. */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.tile-label {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.tile-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.create-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.create-fields label {
+  flex: 1 1 180px;
+}
+
+/* Tables */
+
+/* position: relative makes this box the anchor for the visually hidden labels
+   inside the table; without it they escape the scroll area and widen the page. */
+.table-scroll {
+  position: relative;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+}
+
+.table th {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tr.is-selected td {
+  background: var(--hover);
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.readings {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* Status: the icon carries the color, the word stays in ink. */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-icon {
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+.tone-good {
+  color: var(--good);
+}
+
+.tone-warning {
+  color: var(--warning);
+}
+
+.tone-critical {
+  color: var(--critical);
+}
+
+.tone-neutral {
+  color: var(--muted);
+}
+
+.status-next {
+  color: var(--ink-2);
+}
+
+.meter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.meter-track {
+  width: 64px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--track);
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--series-1);
+}
+
+/* Detail */
+
+.detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--hover);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--series-1);
+  font-weight: 600;
+}
+
+.chip[aria-pressed='true']::before {
+  content: '✓ ';
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.charts {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 960px) {
+  .charts {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* While a new range loads, the previous charts stay up, dimmed. */
+.is-refreshing {
+  opacity: 0.5;
+  transition: opacity 150ms;
+}
+
+.empty {
+  padding: 24px 0;
+}
+
+/* Charts: thin marks, hairline grid, the data is the only loud thing. */
+
+/* Block layout, not grid: the plot must take its width from the column, never
+   from the SVG inside it, or the chart would size itself from its own drawing. */
+.chart {
+  min-width: 0;
+  margin: 0;
+}
+
+.chart-title {
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.chart-plot {
+  position: relative;
+  min-width: 0;
+}
+
+.chart-plot svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--grid);
+  shape-rendering: crispEdges;
+}
+
+.chart-baseline {
+  stroke: var(--baseline);
+  shape-rendering: crispEdges;
+}
+
+.chart-tick {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-area {
+  fill: var(--series-1);
+  fill-opacity: 0.1;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-dot {
+  fill: var(--series-1);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart-end-label {
+  fill: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-crosshair {
+  stroke: var(--baseline);
+}
+
+.chart-tooltip {
+  position: absolute;
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  transform: translate(-50%, calc(-100% - 14px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart-tooltip strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+}
+
+.chart-tooltip span {
+  color: var(--ink-2);
+}
+
+.chart-key {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--series-1);
+}
+
+/* Activity */
+
+.activity {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.activity li:last-child {
+  border-bottom: 0;
+}
+
+.activity time {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}

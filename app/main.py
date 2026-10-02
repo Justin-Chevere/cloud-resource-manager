@@ -3,8 +3,10 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app import models  # noqa: F401  (registers the tables on Base.metadata)
 from app.config import get_settings
@@ -15,6 +17,10 @@ from app.routers import audit, auth, health, metrics, resources, users
 from app.runtime import build_runtime
 
 logger = logging.getLogger(__name__)
+
+# Built by `npm run build` in dashboard/. Serving it from the API's own origin keeps
+# production to one process, with no cross-origin setup in the browser.
+DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard" / "dist"
 
 
 @asynccontextmanager
@@ -47,7 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await task
 
 
-def create_app() -> FastAPI:
+def create_app(dashboard_dir: Path = DASHBOARD_DIR) -> FastAPI:
     app = FastAPI(title=get_settings().app_name, lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(auth.router)
@@ -55,6 +61,9 @@ def create_app() -> FastAPI:
     app.include_router(metrics.router)
     app.include_router(users.router)
     app.include_router(audit.router)
+    # Mounted last, so API routes always win over files of the same name.
+    if dashboard_dir.is_dir():
+        app.mount("/", StaticFiles(directory=dashboard_dir, html=True), name="dashboard")
     return app
 
 
